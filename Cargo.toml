@@ -1,0 +1,43 @@
+[package]
+name = "shousetsu-dump"
+version = "0.1.0"
+license = "BSL-1.0"
+description = "Web novel dumping tool"
+edition = "2024"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+keywords = ["小説", "novel"]
+repository = "https://github.com/DoumanAsh/shousetsu-dump"
+documentation = "https://docs.rs/shousetsu-dump"
+
+[dependencies]
+serde = "1"
+serde_derive = "1"
+serde_json = "1"
+serde_ignored_type = "1"
+env-smart = "1"
+
+[dependencies.str-buf]
+version = "4"
+features = ["serde"]
+
+[dependencies.ureq]
+version = "3"
+default-features = false
+features = ["rustls", "platform-verifier", "json"]
+
+[dependencies.arg]
+version = "0.4"
+
+[dependencies.scraper]
+version = "0.25"
+default-features = false
+
+[profile.release]
+lto = true
+opt-level = 3
+codegen-units = 1
+strip = true
