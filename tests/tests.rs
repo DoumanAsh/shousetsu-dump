@@ -61,6 +61,15 @@ fn should_parse_novel_id() {
 }
 
 #[test]
+fn should_parse_kakuyomu_title() {
+    const DATA: &str = r#"超難関ダンジョンで10万年修行した結果、世界最強に～最弱無能の下剋上～（最弱で迫害までされていたけど、超難関迷宮で10万年修行した結果、強くなりすぎて敵がいなくなった）（力水） - カクヨム"#;
+
+    let title = novel::Title::new_kakuyomu(DATA);
+    assert_eq!(title.name, "超難関ダンジョンで10万年修行した結果、世界最強に～最弱無能の下剋上～");
+    assert_eq!(title.author, Some("力水"));
+}
+
+#[test]
 fn should_parse_empty_syosetu_result() {
     const DATA: &str = r#"[{"allcount":0}]"#;
 

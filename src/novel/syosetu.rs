@@ -3,20 +3,7 @@ use serde_derive::Deserialize;
 use core::fmt::{self, Write};
 
 use crate::http;
-use super::{Id, BackendKind};
-
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct Chapter(u32);
-
-impl super::Chapter for Chapter {
-    fn preapre_url(&self, id: &Id, out: &mut String) {
-        let url = id.url();
-        let id = self.0;
-        //writing string cannot fail (aside from OOM)
-        let _ = write!(out, "{url}/{id}");
-    }
-}
+use super::{Id, BackendKind, Chapter, IdBuffer};
 
 pub struct ChapterIter {
     start: u32,
@@ -27,14 +14,20 @@ impl Iterator for ChapterIter {
     type Item = Chapter;
     fn next(&mut self) -> Option<Self::Item> {
         if self.start <= self.end {
-            let result = Chapter(self.start);
+            let result = self.start;
             self.start = self.start.saturating_add(1);
-            Some(result)
+
+            let mut id = IdBuffer::new();
+            let _ = write!(&mut id, "{}", result);
+            Some(Chapter {
+                id
+            })
         } else {
             None
         }
     }
 }
+
 impl ExactSizeIterator for ChapterIter {
     #[inline(always)]
     fn len(&self) -> usize {
@@ -90,14 +83,13 @@ impl fmt::Debug for NovelInfo {
            .field("Url", &self.id.url())
            .field("Title", &self.novel.title)
            .field("Author", &self.novel.writer)
-           .field("Chapter number", &self.novel.chapter_count)
+           .field("Number of Chapter", &self.novel.chapter_count)
            .field("Updated at", &self.novel.updated_at)
            .finish()
     }
 }
 
 impl super::NovelInfo for NovelInfo {
-    type Chapter = Chapter;
     type ChapterIter = ChapterIter;
 
     #[inline(always)]
@@ -113,7 +105,7 @@ impl super::NovelInfo for NovelInfo {
         })
     }
     #[inline(always)]
-    fn chapters(&mut self) -> super::Result<Self::ChapterIter> {
+    fn chapters(&self) -> super::Result<Self::ChapterIter> {
         Ok(ChapterIter {
             start: 1,
             end: self.novel.chapter_count

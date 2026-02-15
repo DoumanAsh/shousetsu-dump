@@ -1,4 +1,4 @@
-use core::fmt;
+use core::fmt::{self, Write};
 
 use crate::http;
 use crate::utils::StrExt;
@@ -178,17 +178,29 @@ pub struct Title<'a> {
     pub author: Option<&'a str>,
 }
 
-pub trait Chapter {
-    ///Generates chapter URL given novel `id`
-    fn preapre_url(&self, id: &Id, out: &mut String);
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct Chapter {
+    id: IdBuffer,
+}
+
+impl Chapter {
+    fn preapre_url(&self, id: &Id, out: &mut String) {
+        let novel_id = id.id.as_str();
+        let chapter_id = self.id.as_str();
+        let _ = match id.kind() {
+            BackendKind::Syosetu => write!(out, "https://novelapi.syosetu.com/{novel_id}/{chapter_id}"),
+            BackendKind::R18Syosetu => write!(out, "https://novel18api.syosetu.com/{novel_id}/{chapter_id}"),
+            BackendKind::Kakuyomu => write!(out, "https://kakuyomu.jp/works/{novel_id}/episodes/{chapter_id}"),
+        };
+    }
 }
 
 ///Describes novel information
 pub trait NovelInfo: fmt::Debug {
-    type Chapter: Chapter;
-    type ChapterIter: ExactSizeIterator<Item = Self::Chapter>;
+    type ChapterIter: ExactSizeIterator<Item = Chapter>;
     fn id(&self) -> &Id;
     fn title(&self) -> Result<Title<'_>, Error>;
-    fn chapters(&mut self) -> Result<Self::ChapterIter, Error>;
+    fn chapters(&self) -> Result<Self::ChapterIter, Error>;
 }
 

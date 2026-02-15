@@ -2,10 +2,10 @@ use scraper::html::Html;
 use scraper::selector::Selector;
 use serde_ignored_type::IgnoredAny;
 
-use core::fmt::{self, Write};
+use core::fmt;
 use std::borrow::Cow;
 
-use super::{Title, Id, IdBuffer};
+use super::{Title, Id, IdBuffer, Chapter};
 use crate::http;
 
 impl<'a> Title<'a> {
@@ -22,25 +22,9 @@ impl<'a> Title<'a> {
                 let mut author = &title[..idx];
                 //Make sure we have opening bracket
                 match author.rfind(AUTHOR_START) {
-                    Some(mut start_idx) => {
-                        //If author used brackets in his name, then we need to account for that
-                        //So we count number of round brackets
-                        let mut sub_end_count = 0usize;
-                        let mut author_sub = author;
-                        while let Some(nested_idx) = author_sub.rfind(AUTHOR_END) {
-                            sub_end_count = sub_end_count.saturating_add(1);
-                            author_sub = &author_sub[..nested_idx];
-                        }
-
-                        //if there is nested closing brackets, then skip equal number of opening brackets
-                        while sub_end_count > 0 {
-                            if let Some(new_idx) = author[..start_idx - AUTHOR_START.len_utf8()].rfind(AUTHOR_START) {
-                                sub_end_count -= 1;
-                                start_idx = new_idx;
-                            } else {
-                                break;
-                            }
-                        }
+                    Some(start_idx) => {
+                        //TODO consider authors that use brackets inside their name
+                        //     it is dangerous to bluntly look for next brackets as title also can have brackets inside
                         author = &author[start_idx + AUTHOR_START.len_utf8()..];
                         title = &title[..start_idx];
 
@@ -56,21 +40,6 @@ impl<'a> Title<'a> {
             name: title,
             author,
         }
-    }
-}
-
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct Chapter {
-    id: IdBuffer,
-}
-
-impl super::Chapter for Chapter {
-    fn preapre_url(&self, id: &Id, out: &mut String) {
-        let url = id.url();
-        let id = self.id.as_str();
-        //writing string cannot fail (aside from OOM)
-        let _ = write!(out, "{url}/episodes/{id}");
     }
 }
 
@@ -192,6 +161,9 @@ impl fmt::Debug for NovelInfo {
                 fmt.field("Author", &author);
             }
         }
+        if let Ok(chapters) = super::NovelInfo::chapters(self) {
+           fmt.field("Number of Chapter", &chapters.len());
+        }
 
         fmt.finish()
     }
@@ -199,8 +171,7 @@ impl fmt::Debug for NovelInfo {
 }
 
 impl super::NovelInfo for NovelInfo {
-    type Chapter = Chapter;
-    type ChapterIter = std::vec::IntoIter<Self::Chapter>;
+    type ChapterIter = std::vec::IntoIter<Chapter>;
 
     #[inline(always)]
     fn id(&self) -> &Id {
@@ -215,7 +186,7 @@ impl super::NovelInfo for NovelInfo {
         }
     }
 
-    fn chapters(&mut self) -> super::Result<Self::ChapterIter> {
+    fn chapters(&self) -> super::Result<Self::ChapterIter> {
         let script = Selector::parse("script").unwrap();
 
         for elem in self.inner.select(&script) {
