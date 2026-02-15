@@ -13,7 +13,15 @@ pub fn default_from_value() -> NonZeroUsize {
 }
 
 #[derive(Args, Debug)]
-///Utility to download text of the kakuyomu novels
+///Utility to download text of the web novels
+///
+///Supported websites:
+///- kakuyomu.jp
+///- syosetu.com
+///
+///In case of issue please file issue on https://github.com/DoumanAsh/shousetsu-dump
+///
+///Always include URL to the novel alongside command line parameters you run
 pub struct Cli {
     #[arg(long, default_value = "default_from_value()")]
     ///Specify from which chapter to start dumping. Default: 1.
