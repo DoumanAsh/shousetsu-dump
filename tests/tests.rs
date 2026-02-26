@@ -1,4 +1,4 @@
-use shousetsu_dump::novel;
+use shousetsu_dump::{novel, http};
 use shousetsu_dump::utils::StrExt;
 
 #[test]
@@ -83,4 +83,11 @@ fn should_parse_valid_syosetu_result() {
 
     let result: Vec<shousetsu_dump::novel::syosetu::ApiResponse> = serde_json::from_str(DATA).expect("to parse empty result");
     assert_eq!(result.len(), 2);
+}
+
+#[test]
+fn should_validate_url_redirect_resolver() {
+    let http = http::Client::new();
+    let url = http.resolve_url_location("https://21028.mitemin.net/userpageimage/viewimagebig/icode/i581566/");
+    assert_eq!(url, "https://img1.mitemin.net/iz/ux/jtdmiq9jj92djjdogu5c7jo14i9f_jk7_yd_1ci_132jk.jpg.580.jpg");
 }
