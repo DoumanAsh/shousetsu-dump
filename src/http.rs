@@ -1,4 +1,5 @@
 use std::io;
+use std::borrow::Cow;
 use core::{time, fmt};
 
 type Response = ureq::http::Response<ureq::Body>;
@@ -97,12 +98,40 @@ impl Client {
         }
     }
 
+    ///Attempts to determine true location of `url` by resolving all possible redirects and
+    ///returning potentially new location
+    pub fn resolve_url_location<'a>(&self, url: &'a str) -> Cow<'a, str> {
+        let response = self.inner.head(url).config().max_redirects(0).build().call();
+        match response {
+            Ok(response) => match response.status().as_u16() {
+                300..=399 => match response.headers().get("location").and_then(|header| header.to_str().ok()) {
+                    Some(header) => header.to_string().into(),
+                    None => url.into(),
+                }
+                _ => url.into(),
+            }
+            Err(_) => url.into(),
+        }
+    }
+
+    #[inline(always)]
     pub fn get<T: FromResponse>(&self, url: &str) -> Result<T, Error> {
-        let response = self.inner.get(url).call()?;
+        self.get_with_headers(url, &[])
+    }
+
+    pub fn get_with_headers<T: FromResponse>(&self, url: &str, headers: &[(&str, &str)]) -> Result<T, Error> {
+        let mut request = self.inner.get(url);
+
+        for (key, value) in headers {
+            request = request.header(*key, *value);
+        }
+
+        let response = request.call()?;
         if response.status() != 200 {
             Err(Error::StatusFailed(response.status().as_u16()))
         } else {
             T::read_response(response)
         }
     }
+
 }

@@ -5,7 +5,7 @@ use serde_ignored_type::IgnoredAny;
 use core::fmt;
 use std::borrow::Cow;
 
-use super::{Title, Id, IdBuffer, Chapter};
+use super::{Title, Id, IdBuffer, Chapter, Line};
 use crate::http;
 
 impl<'a> Title<'a> {
@@ -112,13 +112,15 @@ pub struct Index<'a> {
 pub struct NovelInfo {
     id: Id,
     inner: Html,
+    selectors: ChapterSelector,
 }
 
 impl NovelInfo {
     pub fn new(id: Id, html: &str) -> Self {
         Self {
             id,
-            inner: Html::parse_document(html)
+            inner: Html::parse_document(html),
+            selectors: ChapterSelector::new(),
         }
     }
 
@@ -170,6 +172,29 @@ impl fmt::Debug for NovelInfo {
 
 }
 
+struct ChapterContent<'a> {
+    html: scraper::Html,
+    selectors: &'a ChapterSelector,
+}
+
+impl super::ChapterContent for ChapterContent<'_> {
+    fn title(&self) -> super::Result<String> {
+        match self.html.select(&self.selectors.title).next() {
+            Some(title) => Ok(title.inner_html()),
+            None => Err(super::Error::invalid_chapter_content("Cannot find .widget-episodeTitle with title".into())),
+        }
+    }
+
+    fn lines(&self) -> super::Result<impl Iterator<Item = Line> + '_> {
+        let body = match self.html.select(&self.selectors.body).next() {
+            Some(body) => body,
+            None => return Err(super::Error::invalid_chapter_content("Cannot find .widget-episodeBody.js-episode-body with text".into())),
+        };
+
+        Ok(body.select(&self.selectors.line).map(Line::new_kakuyomu))
+    }
+}
+
 impl super::NovelInfo for NovelInfo {
     type ChapterIter = std::vec::IntoIter<Chapter>;
 
@@ -182,7 +207,7 @@ impl super::NovelInfo for NovelInfo {
         let title = Selector::parse("title").unwrap();
         match self.inner.select(&title).next().and_then(|title| title.text().next()) {
             Some(title) => Ok(Title::new_kakuyomu(title)),
-            None => Err(super::Error::MissingIndex),
+            None => Err(super::Error::MissingTitle),
         }
     }
 
@@ -204,6 +229,39 @@ impl super::NovelInfo for NovelInfo {
         }
 
         Err(super::Error::MissingChapters)
+    }
+
+    fn extract_chapter_content<'a>(&'a self, body: &'a str) -> impl super::ChapterContent + 'a {
+        ChapterContent {
+            html: scraper::Html::parse_fragment(body),
+            selectors: &self.selectors,
+        }
+    }
+}
+
+pub struct ChapterSelector {
+    body: Selector,
+    line: Selector,
+    title: Selector,
+}
+
+impl ChapterSelector {
+    pub fn new() -> Self {
+        Self {
+            body: Selector::parse(".widget-episodeBody.js-episode-body").unwrap(),
+            line: Selector::parse("p").unwrap(),
+            title: Selector::parse(".widget-episodeTitle").unwrap()
+        }
+    }
+}
+
+impl Line {
+    #[inline(always)]
+    fn new_kakuyomu(line: scraper::ElementRef<'_>) -> Self {
+        match line.attr("class") {
+            Some("blank") => Self::Break,
+            _ => Self::Paragraph(line.inner_html()),
+        }
     }
 }
 

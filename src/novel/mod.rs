@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use core::fmt::{self, Write};
 
 use crate::http;
@@ -17,6 +18,7 @@ pub enum Error {
     Transient(http::Error),
     Internal(http::Error),
     NotFound,
+    InvalidChapterContent(Cow<'static, str>),
 }
 
 impl Error {
@@ -25,6 +27,12 @@ impl Error {
             http::Error::Internal(_) => Self::Internal(error),
             _ => Self::Transient(error),
         }
+    }
+
+    #[cold]
+    #[inline(never)]
+    pub fn invalid_chapter_content(error: Cow<'static, str>) -> Self {
+        Self::InvalidChapterContent(error)
     }
 }
 
@@ -39,6 +47,7 @@ impl fmt::Display for Error {
             Self::Transient(error) => fmt.write_fmt(format_args!("Unable to make request: {error}")),
             Self::Internal(error) => fmt.write_fmt(format_args!("Internal error: {error}")),
             Self::NotFound => fmt.write_str("No such novel found"),
+            Self::InvalidChapterContent(error) => fmt.write_fmt(format_args!("Unable to parse chapter body: {error}")),
         }
     }
 }
@@ -72,6 +81,13 @@ impl BackendKind {
     pub const fn is_syosetu(&self) -> bool {
         matches!(self, Self::Syosetu | Self::R18Syosetu)
     }
+
+    #[inline(always)]
+    ///Returns whether it is syosetu r18 novel
+    pub const fn is_syosetu_r18(&self) -> bool {
+        matches!(self, Self::R18Syosetu)
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -185,22 +201,63 @@ pub struct Chapter {
 }
 
 impl Chapter {
-    fn preapre_url(&self, id: &Id, out: &mut String) {
+    ///Generates URL to fetch chapter
+    pub fn preapre_url(&self, id: &Id, out: &mut String) {
         let novel_id = id.id.as_str();
         let chapter_id = self.id.as_str();
         let _ = match id.kind() {
-            BackendKind::Syosetu => write!(out, "https://novelapi.syosetu.com/{novel_id}/{chapter_id}"),
-            BackendKind::R18Syosetu => write!(out, "https://novel18api.syosetu.com/{novel_id}/{chapter_id}"),
+            BackendKind::Syosetu => write!(out, "https://ncode.syosetu.com/{novel_id}/{chapter_id}"),
+            BackendKind::R18Syosetu => write!(out, "https://novel18.syosetu.com/{novel_id}/{chapter_id}"),
             BackendKind::Kakuyomu => write!(out, "https://kakuyomu.jp/works/{novel_id}/episodes/{chapter_id}"),
         };
     }
 }
 
+///Parsed content of the chapter
+pub trait ChapterContent {
+    ///Extracts Chapter title
+    fn title(&self) -> Result<String>;
+    ///Extracts Chapter content
+    fn lines(&self) -> Result<impl Iterator<Item = Line> + '_>;
+}
+
+///Possible variants for novel's body line
+pub enum Line {
+    ///Line of text to write
+    Paragraph(String),
+    ///URL with image and alt title
+    Img(String, String),
+    ///Indicates empty line/line break
+    Break,
+}
+
 ///Describes novel information
 pub trait NovelInfo: fmt::Debug {
     type ChapterIter: ExactSizeIterator<Item = Chapter>;
+    ///Returns novel id
     fn id(&self) -> &Id;
+    ///Returns title of the novel
     fn title(&self) -> Result<Title<'_>, Error>;
+    ///Returns iterator of chapters
     fn chapters(&self) -> Result<Self::ChapterIter, Error>;
+
+    ///Retrieves chapter content extractor
+    fn extract_chapter_content<'a>(&'a self, body: &'a str) -> impl ChapterContent + 'a;
+
+    #[inline(always)]
+    ///Returns list of headers to use when fetching chapter data
+    fn headers(&self) -> &[(&str, &str)] {
+        &[]
+    }
 }
 
+pub trait GetNovelInfo {
+    fn get_novel(&self, id: Id, http: &http::Client) -> Result<impl NovelInfo>;
+}
+
+impl<N: NovelInfo, T: Fn(Id, &http::Client) -> Result<N>> GetNovelInfo for T {
+    #[inline(always)]
+    fn get_novel(&self, id: Id, http: &http::Client) -> Result<impl NovelInfo> {
+        (self)(id, http)
+    }
+}

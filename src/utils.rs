@@ -1,7 +1,58 @@
-use std::io;
-use core::mem;
+use std::time;
+use core::{fmt, mem};
 
-use crate::stdio;
+pub struct StringBuffer {
+    buffer: String,
+}
+
+impl StringBuffer {
+    #[inline(always)]
+    pub fn new() -> Self {
+        Self {
+            buffer: String::new()
+        }
+    }
+
+    #[inline(always)]
+    pub fn acquire(&mut self) -> StringBufferGuard<'_> {
+        StringBufferGuard {
+            buffer: &mut self.buffer
+        }
+    }
+}
+
+pub struct StringBufferGuard<'a> {
+    buffer: &'a mut String
+}
+
+impl core::ops::Deref for StringBufferGuard<'_> {
+    type Target = String;
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.buffer
+    }
+}
+
+impl core::ops::DerefMut for StringBufferGuard<'_> {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer
+    }
+}
+
+impl fmt::Display for StringBufferGuard<'_> {
+    #[inline(always)]
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.buffer, fmt)
+    }
+}
+
+impl Drop for StringBufferGuard<'_> {
+    #[inline(always)]
+    fn drop(&mut self) {
+        self.buffer.clear();
+    }
+}
 
 pub trait IterExt: Iterator {
     fn collect_exact<const N: usize>(self) -> Option<[Self::Item; N]>;
@@ -45,9 +96,9 @@ impl StrExt for str {
 
 pub struct PaceMaker {
     count: u16,
-    last_stop_time: std::time::Instant,
+    last_stop_time: time::Instant,
     rate_limit: u16,
-    sleep_interval: core::time::Duration,
+    sleep_interval: time::Duration,
 }
 
 impl PaceMaker {
@@ -60,19 +111,41 @@ impl PaceMaker {
         }
     }
 
-    pub fn on_chapter_finished(&mut self, stdout: &mut stdio::Out<impl io::Write + core::fmt::Debug, stdio::behavior::Ignore>) {
+    pub fn on_chapter_finished(&mut self) -> Option<Throttle<'_>> {
         if self.rate_limit == 0 {
-            return;
+            return None;
         }
 
         self.count += 1;
         if self.count >= self.rate_limit {
-            if let Some(sleep_time) = self.sleep_interval.checked_sub(self.last_stop_time.elapsed()) {
-                stdout.write_fmtn(format_args!("Wait {:.3}s...", sleep_time.as_secs_f64()));
-                std::thread::sleep(sleep_time);
-            }
-            self.count = 0;
-            self.last_stop_time = std::time::Instant::now();
+            Some(Throttle {
+                duration: self.sleep_interval.checked_sub(self.last_stop_time.elapsed()),
+                pace_maker: self,
+            })
+        } else {
+            None
         }
+    }
+}
+
+///Throttling result, returned when throttle may be necessary
+///
+///On drop resets `PaceMaker` and optionally perform sleep per `duration`
+pub struct Throttle<'a> {
+    pace_maker: &'a mut PaceMaker,
+    duration: Option<time::Duration>
+}
+
+impl Throttle<'_> {
+    #[inline(always)]
+    pub fn duration(&self) -> Option<time::Duration> {
+        self.duration
+    }
+}
+
+impl Drop for Throttle<'_> {
+    fn drop(&mut self) {
+        self.pace_maker.count = 0;
+        self.pace_maker.last_stop_time = time::Instant::now();
     }
 }

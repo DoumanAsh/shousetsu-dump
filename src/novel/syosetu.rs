@@ -3,7 +3,7 @@ use serde_derive::Deserialize;
 use core::fmt::{self, Write};
 
 use crate::http;
-use super::{Id, BackendKind, Chapter, IdBuffer};
+use super::{Id, BackendKind, Chapter, Line, IdBuffer};
 
 pub struct ChapterIter {
     start: u32,
@@ -89,6 +89,19 @@ impl fmt::Debug for NovelInfo {
     }
 }
 
+struct ChapterContent(scraper::Html);
+
+impl super::ChapterContent for ChapterContent {
+    fn title(&self) -> super::Result<String> {
+        Err(super::Error::invalid_chapter_content("not implemented".into()))
+    }
+
+    fn lines(&self) -> super::Result<impl Iterator<Item = Line> + '_> {
+        Err::<core::array::IntoIter<Line, 0>, _>(super::Error::invalid_chapter_content("not implemented".into()))
+    }
+}
+
+
 impl super::NovelInfo for NovelInfo {
     type ChapterIter = ChapterIter;
 
@@ -110,6 +123,18 @@ impl super::NovelInfo for NovelInfo {
             start: 1,
             end: self.novel.chapter_count
         })
+    }
+
+    fn extract_chapter_content<'a>(&'a self, body: &'a str) -> impl super::ChapterContent + 'a {
+        ChapterContent(scraper::Html::parse_document(body))
+    }
+
+    fn headers(&self) -> &[(&str, &str)] {
+        if self.id.kind().is_syosetu_r18() {
+            &[("Cookie", "over18=yes")]
+        } else {
+            &[]
+        }
     }
 }
 

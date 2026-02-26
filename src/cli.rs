@@ -41,6 +41,9 @@ pub struct Cli {
     #[arg(long, default_value = "1")]
     ///Interval between rated downloads. Defaults to 1 second.
     pub rate_interval: u64,
+    #[arg(short, long, default_value = "false")]
+    ///Specifies to fetch novel index without download. Defaults false.
+    pub dry: bool,
 }
 
 
