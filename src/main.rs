@@ -305,6 +305,7 @@ fn perform_novel_fetch<N: novel::GetNovelInfo>(stdio: Stdio, args: cli::Cli, fet
 
         stdout.write_fmtn(format_args!("OK"));
         write_novel!("\n{idx} {title}\n-------------------\n");
+        let mut chapter_parted = false;
         for line in lines {
             match line {
                 novel::Line::Break => write_novel!("<br/>\n\n"),
@@ -313,7 +314,11 @@ fn perform_novel_fetch<N: novel::GetNovelInfo>(stdio: Stdio, args: cli::Cli, fet
                     let url = http.resolve_url_location(&url);
                     write_novel!("![{alt}]({url})\n\n")
                 },
-                novel::Line::ChapterDiv => write_novel!("\n<div class=\"ch_div\">-------</div>\n\n"),
+                novel::Line::ChapterDiv => if chapter_parted {
+                    write_novel!("\n<div class=\"ch_div\">-------</div>\n\n");
+                } else {
+                    chapter_parted = true;
+                }
             }
         }
 

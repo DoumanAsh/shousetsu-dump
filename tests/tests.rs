@@ -108,7 +108,7 @@ fn should_fetch_syosetu_novel() {
     let chapter1_html: String = http.get_with_headers(&chapter1_url, http_headers).expect("to fetch novel");
     let body = novel_info.extract_chapter_content(&chapter1_html);
     let lines = body.lines().expect("to fetch lines").collect::<Vec<_>>();
-    let img = &lines[0];
+    let img = &lines[1];
     if let novel::Line::Img(src, alt) = img {
         assert_eq!(src, "https://21028.mitemin.net/userpageimage/viewimagebig/icode/i581566/");
         assert_eq!(alt, "挿絵(By みてみん)");

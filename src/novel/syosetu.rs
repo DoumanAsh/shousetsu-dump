@@ -125,7 +125,7 @@ impl super::ChapterContent for ChapterContent<'_> {
         let body = self.html.select(&self.selectors.body);
 
         Ok(body.map(|body| {
-            body.child_elements().filter_map(|element| {
+            [Line::ChapterDiv].into_iter().chain(body.child_elements().filter_map(|element| {
                 if element.value().name() == "p" {
                     let text: String = element.text().collect();
                     let text = if text.trim().is_empty() {
@@ -161,7 +161,7 @@ impl super::ChapterContent for ChapterContent<'_> {
                 } else {
                     None
                 }
-            }).flatten().chain(Some(Line::ChapterDiv)) //individual body
+            }).flatten()) //individual body
         }).flatten()) //body chain
     }
 }

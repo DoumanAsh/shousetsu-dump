@@ -13,6 +13,7 @@ pub fn default_from_value() -> NonZeroUsize {
 }
 
 #[derive(Args, Debug)]
+///shousetsu-dump 1.0.0-beta.2
 ///Utility to download text of the web novels
 ///
 ///Supported websites:
