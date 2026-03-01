@@ -145,6 +145,11 @@ impl Id {
     pub const fn url(&self) -> Url<'_> {
         Url(self)
     }
+
+    #[inline(always)]
+    pub const fn original_url(&self) -> OriginalUrl<'_> {
+        OriginalUrl(self)
+    }
 }
 
 impl core::str::FromStr for Id {
@@ -189,6 +194,36 @@ impl fmt::Display for Url<'_> {
     }
 }
 
+#[repr(transparent)]
+#[derive(Clone, Copy)]
+pub struct OriginalUrl<'a>(&'a Id);
+
+impl OriginalUrl<'_> {
+    #[inline(always)]
+    pub fn write_to(&self, out: &mut impl fmt::Write) -> fmt::Result {
+        let Id { kind, id } = self.0;
+        match kind {
+            BackendKind::Syosetu => write!(out, "https://ncode.syosetu.com/{id}"),
+            BackendKind::R18Syosetu => write!(out, "https://novel18.syosetu.com/{id}"),
+            BackendKind::Kakuyomu => write!(out, "https://kakuyomu.jp/works/{id}"),
+        }
+    }
+}
+
+impl fmt::Debug for OriginalUrl<'_> {
+    #[inline(always)]
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.write_to(fmt)
+    }
+}
+
+impl fmt::Display for OriginalUrl<'_> {
+    #[inline(always)]
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.write_to(fmt)
+    }
+}
+
 pub struct Title<'a> {
     pub name: &'a str,
     pub author: Option<&'a str>,
@@ -221,6 +256,7 @@ pub trait ChapterContent {
     fn lines(&self) -> Result<impl Iterator<Item = Line> + '_>;
 }
 
+#[derive(Debug)]
 ///Possible variants for novel's body line
 pub enum Line {
     ///Line of text to write
@@ -229,6 +265,8 @@ pub enum Line {
     Img(String, String),
     ///Indicates empty line/line break
     Break,
+    ///Indicates separate between text blocks in chapter
+    ChapterDiv
 }
 
 ///Describes novel information

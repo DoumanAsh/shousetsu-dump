@@ -1,3 +1,5 @@
+use scraper::html::Html;
+use scraper::selector::Selector;
 use serde_derive::Deserialize;
 
 use core::fmt::{self, Write};
@@ -64,14 +66,16 @@ pub enum ApiResponse {
 pub struct NovelInfo {
     id: Id,
     novel: Info,
+    selectors: ChapterSelector,
 }
 
 impl NovelInfo {
     #[inline(always)]
-    const fn new(id: Id, novel: Info) -> Self {
+    fn new(id: Id, novel: Info) -> Self {
         Self {
             id,
-            novel
+            novel,
+            selectors: ChapterSelector::new(),
         }
     }
 }
@@ -89,15 +93,76 @@ impl fmt::Debug for NovelInfo {
     }
 }
 
-struct ChapterContent(scraper::Html);
+pub struct ChapterSelector {
+    body: Selector,
+    title: Selector,
+}
 
-impl super::ChapterContent for ChapterContent {
+impl ChapterSelector {
+    pub fn new() -> Self {
+        Self {
+            body: Selector::parse(".p-novel__text").unwrap(),
+            title: Selector::parse(".p-novel__title").unwrap()
+        }
+    }
+}
+
+
+struct ChapterContent<'a> {
+    html: Html,
+    selectors: &'a ChapterSelector,
+}
+
+impl super::ChapterContent for ChapterContent<'_> {
     fn title(&self) -> super::Result<String> {
-        Err(super::Error::invalid_chapter_content("not implemented".into()))
+        match self.html.select(&self.selectors.title).next() {
+            Some(title) => Ok(title.inner_html()),
+            None => Err(super::Error::invalid_chapter_content("Cannot find .p-novel__title with title".into())),
+        }
     }
 
     fn lines(&self) -> super::Result<impl Iterator<Item = Line> + '_> {
-        Err::<core::array::IntoIter<Line, 0>, _>(super::Error::invalid_chapter_content("not implemented".into()))
+        let body = self.html.select(&self.selectors.body);
+
+        Ok(body.map(|body| {
+            body.child_elements().filter_map(|element| {
+                if element.value().name() == "p" {
+                    let text: String = element.text().collect();
+                    let text = if text.trim().is_empty() {
+                        None
+                    } else {
+                        Some(Line::Paragraph(text))
+                    };
+
+                    //Aggregate all descendent elements (except first which is current element)
+                    //We look for `<br>` and `<img>` specifically
+                    //Append text, if available at the end (this normally should not happen as single
+                    //paragraph can hold only one type of element: text, line break, image
+                    Some(element.descendent_elements().skip(1).filter_map(|child| {
+                        let name = child.value().name();
+                        if name == "br" {
+                            Some(Line::Break)
+                        } else if name == "img" {
+                            if let Some(src) = child.attr("src") {
+                                let alt = child.attr("alt").map(|alt| alt.to_owned()).unwrap_or_default();
+                                let src = if src.starts_with("http") {
+                                    src.to_owned()
+                                } else {
+                                    format!("https://{}", src.trim_start_matches('/'))
+                                };
+                                Some(Line::Img(src.to_owned(), alt))
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    }).chain(text))
+                } else {
+                    None
+                }
+            }).flatten().chain(Some(Line::ChapterDiv)) //individual body
+        }).flatten()) //body chain
     }
 }
 
@@ -126,7 +191,10 @@ impl super::NovelInfo for NovelInfo {
     }
 
     fn extract_chapter_content<'a>(&'a self, body: &'a str) -> impl super::ChapterContent + 'a {
-        ChapterContent(scraper::Html::parse_document(body))
+        ChapterContent {
+            html: Html::parse_document(body),
+            selectors: &self.selectors
+        }
     }
 
     fn headers(&self) -> &[(&str, &str)] {

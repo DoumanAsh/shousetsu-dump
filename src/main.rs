@@ -259,14 +259,14 @@ fn perform_novel_fetch<N: novel::GetNovelInfo>(stdio: Stdio, args: cli::Cli, fet
     }
 
     write_novel!("{}\n===================\n", title.name);
-    write_novel!("Original: {}\n", args.novel.url());
+    write_novel!("Original: {}\n\n", args.novel.original_url());
 
     let http_headers = info.headers();
     let mut pacer = utils::PaceMaker::new(args.rate, time::Duration::from_secs(args.rate_interval));
     let mut chapter_url = utils::StringBuffer::new();
 
     stdout.write_fmtn(format_args!("Download chapters: {}..{}", chapter_start_from, chapter_until));
-    for (mut idx, chapter) in chapters.enumerate().skip(chapter_start_from.saturating_sub(1)).take(chapter_until.saturating_sub(chapter_start_from)) {
+    for (mut idx, chapter) in chapters.enumerate().skip(chapter_start_from.saturating_sub(1)).take(chapter_until.saturating_sub(chapter_start_from).saturating_add(1)) {
         use novel::ChapterContent;
 
         idx = idx.saturating_add(1);
@@ -304,15 +304,16 @@ fn perform_novel_fetch<N: novel::GetNovelInfo>(stdio: Stdio, args: cli::Cli, fet
         };
 
         stdout.write_fmtn(format_args!("OK"));
-        write_novel!("\n{idx}. {title}\n-------------------\n");
+        write_novel!("\n{idx} {title}\n-------------------\n");
         for line in lines {
             match line {
-                novel::Line::Break => write_novel!("<br/>\n"),
-                novel::Line::Paragraph(line) => write_novel!("{line}\n\n"),
+                novel::Line::Break => write_novel!("<br/>\n\n"),
+                novel::Line::Paragraph(line) => write_novel!("{line}\n"),
                 novel::Line::Img(url, alt) => {
                     let url = http.resolve_url_location(&url);
                     write_novel!("![{alt}]({url})\n\n")
                 },
+                novel::Line::ChapterDiv => write_novel!("\n<div class=\"ch_div\">-------</div>\n\n"),
             }
         }
 
@@ -330,7 +331,7 @@ fn perform_novel_fetch<N: novel::GetNovelInfo>(stdio: Stdio, args: cli::Cli, fet
     }
     stdout.write_fmtn(format_args!("-------------------"));
     stdout.write_fmtn(format_args!("Output: {}", novel_file_name.display()));
-    stdout.write_fmtn(format_args!("Pandoc command to generate EPUB:\npandoc --embed-resources --standalone --shift-heading-level-by=-1 --from=gfm -o novel.epub \"{}\"", novel_file_name.display()));
+    stdout.write_fmtn(format_args!("Pandoc command to generate EPUB:\npandoc --metadata title=\"{title}\" --embed-resources --standalone --shift-heading-level-by=-1 --from=gfm -o novel.epub \"{}\"", novel_file_name.display(), title=title.name));
     ExitCode::SUCCESS
 }
 

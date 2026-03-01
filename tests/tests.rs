@@ -91,3 +91,28 @@ fn should_validate_url_redirect_resolver() {
     let url = http.resolve_url_location("https://21028.mitemin.net/userpageimage/viewimagebig/icode/i581566/");
     assert_eq!(url, "https://img1.mitemin.net/iz/ux/jtdmiq9jj92djjdogu5c7jo14i9f_jk7_yd_1ci_132jk.jpg.580.jpg");
 }
+
+#[test]
+fn should_fetch_syosetu_novel() {
+    use novel::{NovelInfo, ChapterContent};
+    let syosetu_url = "https://ncode.syosetu.com/n8856gp/";
+    let id = novel::Id::try_parse(syosetu_url).expect("parse syosetu_url");
+
+    let http = http::Client::new();
+    let novel_info = novel::fetch_syosetu(id, &http).expect("to fetch novel");
+    let chapter1 = novel_info.chapters().expect("get chapters").next().unwrap();
+    let mut chapter1_url = String::new();
+    chapter1.preapre_url(novel_info.id(), &mut chapter1_url);
+
+    let http_headers = novel_info.headers();
+    let chapter1_html: String = http.get_with_headers(&chapter1_url, http_headers).expect("to fetch novel");
+    let body = novel_info.extract_chapter_content(&chapter1_html);
+    let lines = body.lines().expect("to fetch lines").collect::<Vec<_>>();
+    let img = &lines[0];
+    if let novel::Line::Img(src, alt) = img {
+        assert_eq!(src, "https://21028.mitemin.net/userpageimage/viewimagebig/icode/i581566/");
+        assert_eq!(alt, "挿絵(By みてみん)");
+    } else {
+        panic!("Expected image but got {:?}", img);
+    }
+}
