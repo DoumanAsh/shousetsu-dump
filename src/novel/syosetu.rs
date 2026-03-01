@@ -84,7 +84,7 @@ impl fmt::Debug for NovelInfo {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Novel Info")
            .field("Id", &self.id.id())
-           .field("Url", &self.id.url())
+           .field("Url", &self.id.original_url())
            .field("Title", &self.novel.title)
            .field("Author", &self.novel.writer)
            .field("Number of Chapter", &self.novel.chapter_count)

@@ -31,6 +31,7 @@ OPTIONS:
     -o,  --out <out>                      Output file name. By default writes ./<title>.md
          --rate <rate>                    Number of chapters to download at most per interval. Defaults to no limit.
          --rate_interval <rate_interval>  Interval between rated downloads. Defaults to 1 second.
+    -d,  --dry                            Specifies to fetch novel index without download. Defaults false.
 
 ARGS:
     <novel>  Id of the novel to dump (e.g. kakuyomu.jp/works/1177354054935164320, novel18.syosetu.com/n9598df/)
@@ -41,5 +42,5 @@ ARGS:
 I recommend to use [pandoc](https://github.com/jgm/pandoc):
 
 ```
-pandoc --embed-resources --standalone --shift-heading-level-by=-1 --from=gfm -o novel.epub novel.md
+pandoc --metadata title="<novel title>" --embed-resources --standalone --shift-heading-level-by=-1 --from=gfm -o novel.epub "./<out>.md"
 ```
