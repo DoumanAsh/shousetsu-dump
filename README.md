@@ -5,7 +5,7 @@ shousetsu-dump
 
 Web novel dumping tool. Following sites are supported:
 - https://syosetu.com/
-    - Including R18 under available under `novel18.syosetu.com`
+    - Including R18 available under `novel18.syosetu.com`
 - https://kakuyomu.jp/
 
 
