@@ -1,6 +1,6 @@
 [package]
 name = "shousetsu-dump"
-version = "1.0.0-beta.2"
+version = "1.0.0-beta.3"
 license = "BSL-1.0"
 description = "Web novel dumping tool"
 edition = "2024"

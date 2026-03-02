@@ -309,7 +309,7 @@ fn perform_novel_fetch<N: novel::GetNovelInfo>(stdio: Stdio, args: cli::Cli, fet
         for line in lines {
             match line {
                 novel::Line::Break => write_novel!("<br/>\n\n"),
-                novel::Line::Paragraph(line) => write_novel!("{line}\n"),
+                novel::Line::Paragraph(line) => write_novel!("{line}\n\n"),
                 novel::Line::Img(url, alt) => {
                     let url = http.resolve_url_location(&url);
                     write_novel!("![{alt}]({url})\n\n")
@@ -334,9 +334,18 @@ fn perform_novel_fetch<N: novel::GetNovelInfo>(stdio: Stdio, args: cli::Cli, fet
         stderr.write_fmtn(format_args!("{}: Cannot write: {error}", novel_file_name.display()));
         return ExitCode::FAILURE
     }
+
     stdout.write_fmtn(format_args!("-------------------"));
     stdout.write_fmtn(format_args!("Output: {}", novel_file_name.display()));
-    stdout.write_fmtn(format_args!("Pandoc command to generate EPUB:\npandoc --metadata title=\"{title}\" --embed-resources --standalone --shift-heading-level-by=-1 --from=gfm -o novel.epub \"{}\"", novel_file_name.display(), title=title.name));
+
+    match novel_file_name.file_stem().and_then(|file_name| file_name.to_str()).or_else(|| novel_file_name.to_str()) {
+        Some(file_name) => {
+            stdout.write_fmtn(format_args!("Pandoc command to generate EPUB:\npandoc --metadata title=\"{title}\" --embed-resources --standalone --shift-heading-level-by=-1 --from=gfm -o \"{file_name}.epub\" \"{file_name}.md\"", title=title.name));
+        },
+        None => {
+            stderr.write_fmtn(format_args!("Cannot format output file name into string, no pandoc command generated"));
+        }
+    }
     ExitCode::SUCCESS
 }
 
