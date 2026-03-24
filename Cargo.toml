@@ -30,7 +30,7 @@ default-features = false
 features = ["rustls", "platform-verifier", "json"]
 
 [dependencies.arg]
-version = "0.4"
+version = "0.4.3"
 
 [dependencies.scraper]
 version = "0.25"
