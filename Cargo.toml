@@ -27,7 +27,7 @@ features = ["serde"]
 [dependencies.ureq]
 version = "3"
 default-features = false
-features = ["rustls", "platform-verifier", "json"]
+features = ["rustls", "platform-verifier", "json", "gzip"]
 
 [dependencies.arg]
 version = "0.4.3"
